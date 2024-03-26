@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use anyhow::{anyhow, Context, Error};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelBridge;
 struct RowData{
     name:String,
@@ -62,20 +63,21 @@ pub fn obr_challenge(file_name:&str)->Result<(),anyhow::Error>{
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(false)
         .from_path(file_name)?;
-    let mut map = HashMap::<String,City>::new();
-    for (idx,result) in reader.records().enumerate(){
-        // if idx % (step_size as usize) == 0{
-        //     println!("{:.0}%",idx as f64/step_size);
-        // }
-        let record = result?;
-        let row = RowData::try_from(record.as_slice())?;
-        if let Some(city) = map.get_mut(&row.name){
-            city.add(row.temp);
-        }else{
-            let new_city = City::from(row);
-            map.insert(new_city.name.to_string(), new_city);
-        }
-    }
+
+    
+    let map: HashMap<String, City> = reader.records()
+        .par_bridge()
+            .map(|result| {
+                let record = result.unwrap();
+                let row = RowData::try_from(record.as_slice()).unwrap();
+                (row.name.clone(), row)
+        }).fold(HashMap::new(), |mut acc, (row_name, row)| {
+            if let Some(city) = acc.get_mut(row_name){
+                
+            }
+        });
+
+
     for city in map.values(){
         let row = city.get_string();
         println!("{row}");
